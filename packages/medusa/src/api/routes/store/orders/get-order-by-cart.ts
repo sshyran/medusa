@@ -1,6 +1,6 @@
-import { defaultStoreOrdersFields, defaultStoreOrdersRelations } from "."
-
 import { OrderService } from "../../../../services"
+import { ExtendedRequest } from "../../../../types/global"
+import { Order } from "../../../../models"
 
 /**
  * @oas [get] /orders/cart/{cart_id}
@@ -21,14 +21,11 @@ import { OrderService } from "../../../../services"
  *             order:
  *               $ref: "#/components/schemas/order"
  */
-export default async (req, res) => {
+export default async (req: ExtendedRequest<Order>, res) => {
   const { cart_id } = req.params
 
   const orderService: OrderService = req.scope.resolve("orderService")
-  const order = await orderService.retrieveByCartId(cart_id, {
-    select: defaultStoreOrdersFields,
-    relations: defaultStoreOrdersRelations,
-  })
+  const order = await orderService.retrieveByCartId(cart_id, req.retrieveConfig)
 
   res.json({ order })
 }
