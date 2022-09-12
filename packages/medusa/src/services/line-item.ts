@@ -1,19 +1,24 @@
 import { MedusaError } from "medusa-core-utils"
 import { BaseService } from "medusa-interfaces"
 import { EntityManager } from "typeorm"
+import { DeepPartial } from "typeorm/common/DeepPartial"
+import TaxInclusivePricingFeatureFlag from "../loaders/feature-flags/tax-inclusive-pricing"
+import { LineItemTaxLine } from "../models"
+import { Cart } from "../models/cart"
+import { LineItem } from "../models/line-item"
+import { LineItemAdjustment } from "../models/line-item-adjustment"
+import { CartRepository } from "../repositories/cart"
 import { LineItemRepository } from "../repositories/line-item"
 import { LineItemTaxLineRepository } from "../repositories/line-item-tax-line"
+import { FindConfig } from "../types/common"
+import { FlagRouter } from "../utils/flag-router"
 import {
   PricingService,
   ProductService,
-  RegionService,
   ProductVariantService,
+  RegionService,
 } from "./index"
-import { CartRepository } from "../repositories/cart"
-import { LineItem } from "../models/line-item"
 import LineItemAdjustmentService from "./line-item-adjustment"
-import { Cart } from "../models/cart"
-import { LineItemAdjustment } from "../models/line-item-adjustment"
 
 type InjectedDependencies = {
   manager: EntityManager
@@ -25,6 +30,7 @@ type InjectedDependencies = {
   pricingService: PricingService
   regionService: RegionService
   lineItemAdjustmentService: LineItemAdjustmentService
+  featureFlagRouter: FlagRouter
 }
 
 /**
@@ -38,7 +44,9 @@ class LineItemService extends BaseService {
   protected readonly cartRepository_: typeof CartRepository
   protected readonly productVariantService_: ProductVariantService
   protected readonly productService_: ProductService
+  protected readonly pricingService_: PricingService
   protected readonly regionService_: RegionService
+  protected readonly featureFlagRouter_: FlagRouter
   protected readonly lineItemAdjustmentService_: LineItemAdjustmentService
 
   constructor({
@@ -51,6 +59,7 @@ class LineItemService extends BaseService {
     regionService,
     cartRepository,
     lineItemAdjustmentService,
+    featureFlagRouter,
   }: InjectedDependencies) {
     super()
 
@@ -63,6 +72,7 @@ class LineItemService extends BaseService {
     this.regionService_ = regionService
     this.cartRepository_ = cartRepository
     this.lineItemAdjustmentService_ = lineItemAdjustmentService
+    this.featureFlagRouter_ = featureFlagRouter
   }
 
   withTransaction(transactionManager: EntityManager): LineItemService {
@@ -80,6 +90,7 @@ class LineItemService extends BaseService {
       regionService: this.regionService_,
       cartRepository: this.cartRepository_,
       lineItemAdjustmentService: this.lineItemAdjustmentService_,
+      featureFlagRouter: this.featureFlagRouter_,
     })
 
     cloned.transactionManager_ = transactionManager
@@ -89,7 +100,11 @@ class LineItemService extends BaseService {
 
   async list(
     selector,
-    config = { skip: 0, take: 50, order: { created_at: "DESC" } }
+    config: FindConfig<LineItem> = {
+      skip: 0,
+      take: 50,
+      order: { created_at: "DESC" },
+    }
   ): Promise<LineItem[]> {
     const manager = this.manager_
     const lineItemRepo = manager.getCustomRepository(this.lineItemRepository_)
@@ -190,6 +205,7 @@ class LineItemService extends BaseService {
     quantity: number,
     context: {
       unit_price?: number
+      includes_tax?: boolean
       metadata?: Record<string, unknown>
       customer_id?: string
       cart?: Cart
@@ -209,6 +225,9 @@ class LineItemService extends BaseService {
         ])
 
         let unit_price = Number(context.unit_price) < 0 ? 0 : context.unit_price
+
+        let unitPriceIncludesTax = false
+
         let shouldMerge = false
 
         if (context.unit_price === undefined || context.unit_price === null) {
@@ -221,7 +240,10 @@ class LineItemService extends BaseService {
               customer_id: context?.customer_id,
               include_discount_prices: true,
             })
-          unit_price = variantPricing.calculated_price
+
+          unitPriceIncludesTax = !!variantPricing.calculated_price_includes_tax
+
+          unit_price = variantPricing.calculated_price ?? undefined
         }
 
         const rawLineItem: Partial<LineItem> = {
@@ -235,6 +257,14 @@ class LineItemService extends BaseService {
           is_giftcard: variant.product.is_giftcard,
           metadata: context?.metadata || {},
           should_merge: shouldMerge,
+        }
+
+        if (
+          this.featureFlagRouter_.isFeatureEnabled(
+            TaxInclusivePricingFeatureFlag.key
+          )
+        ) {
+          rawLineItem.includes_tax = unitPriceIncludesTax
         }
 
         const lineItemRepo = transactionManager.getCustomRepository(
@@ -319,6 +349,19 @@ class LineItemService extends BaseService {
           .then((lineItem) => lineItem && lineItemRepository.remove(lineItem))
       }
     )
+  }
+
+  /**
+   * Create a line item tax line.
+   * @param args - tax line partial passed to the repo create method
+   * @return a new line item tax line
+   */
+  public createTaxLine(args: DeepPartial<LineItemTaxLine>): LineItemTaxLine {
+    const itemTaxLineRepo = this.manager_.getCustomRepository(
+      this.itemTaxLineRepo_
+    )
+
+    return itemTaxLineRepo.create(args)
   }
 }
 

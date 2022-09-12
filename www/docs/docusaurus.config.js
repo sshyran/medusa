@@ -65,6 +65,11 @@ module.exports = {
           label: "Docs"
         },
         {
+          type: "docSidebar",
+          sidebarId: "userGuideSidebar",
+          label: "User Guide"
+        },
+        {
           type: 'dropdown',
           label: 'REST API Reference',
           items: [
@@ -97,6 +102,11 @@ module.exports = {
               label: "CLI Reference",
             },
             {
+              type: "docSidebar",
+              sidebarId: "entitiesSidebar",
+              label: "Entities Reference",
+            },
+            {
               to: "advanced/backend/subscribers/events-list",
               label: "Events Reference",
             },
@@ -111,6 +121,11 @@ module.exports = {
               label: "Services Reference",
             },
           ]
+        },
+        {
+          href: "https://github.com/medusajs/medusa/issues/new?assignees=&labels=type%3A+docs&template=docs.yml",
+          position: 'right',
+          label: 'Report an Issue'
         },
         {
           href: "https://github.com/medusajs/medusa",
@@ -213,7 +228,8 @@ module.exports = {
             expandResponses: "200,204",
             generatedPayloadSamplesMaxDepth: 4,
             showObjectSchemaExamples: true,
-            requiredPropsFirst: true
+            requiredPropsFirst: true,
+            hideRequestPayloadSample: true
           }
         }
       },

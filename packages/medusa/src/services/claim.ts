@@ -18,6 +18,7 @@ import {
   ClaimType,
   FulfillmentItem,
   LineItem,
+  ReturnItem,
 } from "../models"
 import { ClaimRepository } from "../repositories/claim"
 import { DeepPartial, EntityManager } from "typeorm"
@@ -380,7 +381,9 @@ export default class ClaimService extends TransactionBaseService {
         const result: ClaimOrder = await claimRepo.save(created)
 
         if (result.additional_items && result.additional_items.length) {
-          const calcContext = this.totalsService_.getCalculationContext(order)
+          const calcContext = await this.totalsService_.getCalculationContext(
+            order
+          )
           const lineItems = await lineItemServiceTx.list({
             id: result.additional_items.map((i) => i.id),
           })
@@ -425,11 +428,14 @@ export default class ClaimService extends TransactionBaseService {
           await this.returnService_.withTransaction(transactionManager).create({
             order_id: order.id,
             claim_order_id: result.id,
-            items: claim_items.map((ci) => ({
-              item_id: ci.item_id,
-              quantity: ci.quantity,
-              metadata: (ci as any).metadata,
-            })),
+            items: claim_items.map(
+              (ci) =>
+                ({
+                  item_id: ci.item_id,
+                  quantity: ci.quantity,
+                  metadata: (ci as any).metadata,
+                } as ReturnItem)
+            ),
             shipping_method: return_shipping,
             no_notification: evaluatedNoNotification,
           })
