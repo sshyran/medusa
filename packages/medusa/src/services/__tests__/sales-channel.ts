@@ -2,7 +2,7 @@ import { IdMap, MockManager, MockRepository } from "medusa-test-utils"
 import SalesChannelService from "../sales-channel"
 import { EventBusServiceMock } from "../__mocks__/event-bus"
 import { EventBusService, StoreService } from "../index"
-import { FindManyOptions, FindOptionsWhere } from "typeorm"
+import { FindOptionsWhere } from "typeorm"
 import { SalesChannel } from "../../models"
 import { store, StoreServiceMock } from "../__mocks__/store"
 
@@ -15,25 +15,14 @@ describe("SalesChannelService", () => {
 
   const salesChannelRepositoryMock = {
     ...MockRepository({
-      findOne: jest
-        .fn()
-        .mockImplementation(
-          (
-            relations: Array<keyof SalesChannel> = [],
-            optionsWithoutRelations: Omit<
-              FindManyOptions<SalesChannel>,
-              "relations"
-            >
-          ): any => {
-            return Promise.resolve({
-              id:
-                (
-                  optionsWithoutRelations?.where as FindOptionsWhere<SalesChannel>
-                )?.id ?? IdMap.getId("sc_adjhlukiaeswhfae"),
-              ...salesChannelData,
-            })
-          }
-        ),
+      findOne: jest.fn().mockImplementation((query): any => {
+        return Promise.resolve({
+          id:
+            (query?.where as FindOptionsWhere<SalesChannel>)?.id ??
+            IdMap.getId("sc_adjhlukiaeswhfae"),
+          ...salesChannelData,
+        })
+      }),
       findAndCount: jest.fn().mockImplementation(() =>
         Promise.resolve([
           {
@@ -154,12 +143,9 @@ describe("SalesChannelService", () => {
         ...salesChannelData,
       })
 
-      expect(salesChannelRepositoryMock.findOne).toHaveBeenLastCalledWith(
-        undefined,
-        {
-          where: { id: IdMap.getId("sales_channel_1") },
-        }
-      )
+      expect(salesChannelRepositoryMock.findOne).toHaveBeenLastCalledWith({
+        where: { id: IdMap.getId("sales_channel_1") },
+      })
     })
   })
 
