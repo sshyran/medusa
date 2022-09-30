@@ -31,7 +31,7 @@ import {
   UpdateProductInput,
 } from "../types/product"
 import {
-  buildObjectOptionBackToArray,
+  buildLegacySelectOrRelationsFrom,
   buildQuery,
   buildRelations,
   buildSelects,
@@ -252,7 +252,7 @@ class ProductService extends TransactionBaseService {
     const { relations, ...query } = buildQuery(selector, config)
 
     const product = await productRepo.findOneWithRelations(
-      buildObjectOptionBackToArray(relations),
+      buildLegacySelectOrRelationsFrom(relations),
       query as FindWithoutRelationsOptions
     )
 
@@ -900,7 +900,7 @@ class ProductService extends TransactionBaseService {
 
     return {
       query: query as FindWithoutRelationsOptions,
-      relations: buildObjectOptionBackToArray(rels) as (keyof Product)[],
+      relations: buildLegacySelectOrRelationsFrom(rels) as (keyof Product)[],
       q,
     }
   }

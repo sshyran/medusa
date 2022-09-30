@@ -43,7 +43,7 @@ export function buildQuery<TWhereKeys, TEntity = unknown>(
     query.relations = buildRelations<TEntity>(config.relations)
   }
 
-  if ("select" in config) {
+  if ("select" in config && config.select) {
     query.select = buildSelects(config.select as string[])
   }
 
@@ -122,7 +122,7 @@ function buildWhere<TWhereKeys, TEntity>(constraints: TWhereKeys): any {
  * output: [ [ 'test.test1', 'test.test2', 'test.test3.test4' ], 'test2' ]
  * @param input
  */
-export function buildObjectOptionBackToArray<TEntity>(
+export function buildLegacySelectOrRelationsFrom<TEntity>(
   input:
     | FindOptionsWhere<TEntity>
     | FindOptionsSelect<TEntity>
@@ -136,7 +136,7 @@ export function buildObjectOptionBackToArray<TEntity>(
 
   for (const key of Object.keys(input)) {
     if (input[key] != undefined && typeof input[key] === "object") {
-      const deepRes = buildObjectOptionBackToArray(input[key])
+      const deepRes = buildLegacySelectOrRelationsFrom(input[key])
 
       const res = deepRes.reduce((acc, val) => {
         acc.push(`${key}.${val}`)
@@ -167,25 +167,72 @@ export function buildRelations<TEntity>(
   ) as FindOptionsRelations<TEntity>
 }
 
+/**
+ * Convert an collection of dot string into a nested object
+ * @example
+ * input: [
+ *    order,
+ *    order.items,
+ *    order.swaps,
+ *    order.swaps.additional_items,
+ *    order.discounts,
+ *    order.discounts.rule,
+ *    order.claims,
+ *    order.claims.additional_items,
+ *    additional_items,
+ *    additional_items.variant,
+ *    return_order,
+ *    return_order.items,
+ *    return_order.shipping_method,
+ *    return_order.shipping_method.tax_lines
+ * ]
+ * output: {
+ *   "order": {
+ *     "items": true,
+ *     "swaps": {
+ *       "additional_items": true
+ *     },
+ *     "discounts": {
+ *       "rule": true
+ *     },
+ *     "claims": {
+ *       "additional_items": true
+ *     }
+ *   },
+ *   "additional_items": {
+ *     "variant": true
+ *   },
+ *   "return_order": {
+ *     "items": true,
+ *     "shipping_method": {
+ *       "tax_lines": true
+ *     }
+ *   }
+ * }
+ * @param collection
+ */
 function buildRelationsOrSelect<TEntity>(
   collection: string[]
 ): FindOptionsRelations<TEntity> | FindOptionsSelect<TEntity> {
-  const output: FindOptionsRelations<TEntity> = {}
+  let output: FindOptionsRelations<TEntity> = {}
 
   for (const relation of collection) {
     if (relation.indexOf(".") > -1) {
       const nestedRelations = relation.split(".")
-      nestedRelations.reduce(
-        (acc: FindOptionsRelations<TEntity>, nestedRelation: string) => {
-          if (acc[nestedRelation]) {
-            return acc
-          }
 
-          acc[relation] = true
-          return acc
-        },
-        output
-      )
+      let parent = output
+
+      while (nestedRelations.length > 1) {
+        const nestedRelation = nestedRelations.shift() as string
+        parent = parent[nestedRelation] =
+          parent[nestedRelation] !== true &&
+          typeof parent[nestedRelation] === "object"
+            ? parent[nestedRelation]
+            : {}
+      }
+
+      parent[nestedRelations[0]] = true
+
       continue
     }
 

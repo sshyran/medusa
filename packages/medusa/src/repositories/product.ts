@@ -3,7 +3,7 @@ import { Brackets, FindOperator, FindOptionsSelect, In } from "typeorm"
 import { PriceList, Product, SalesChannel } from "../models"
 import { ExtendedFindConfig, WithRequiredProperty } from "../types/common"
 import { dataSource } from "../loaders/database"
-import { buildObjectOptionBackToArray } from "../utils"
+import { buildLegacySelectOrRelationsFrom } from "../utils"
 
 export type DefaultWithoutRelations = Omit<
   ExtendedFindConfig<Product>,
@@ -45,7 +45,7 @@ export const ProductRepository = dataSource.getRepository(Product).extend({
         let querybuilder = this.createQueryBuilder("products")
 
         if (Object.keys(select)?.length) {
-          querybuilder.select(buildObjectOptionBackToArray(select))
+          querybuilder.select(buildLegacySelectOrRelationsFrom(select))
         }
 
         if (toplevel === "variants") {

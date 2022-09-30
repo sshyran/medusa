@@ -350,8 +350,6 @@ class OrderService extends TransactionBaseService {
       query.select = buildSelects(select)
     }
 
-    const rels = query.relations
-    delete query.relations
     const raw = await orderRepo.findOne({
       ...query,
       relationLoadStrategy: "query",

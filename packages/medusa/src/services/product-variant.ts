@@ -36,7 +36,7 @@ import {
   UpdateProductVariantInput,
 } from "../types/product-variant"
 import {
-  buildObjectOptionBackToArray,
+  buildLegacySelectOrRelationsFrom,
   buildQuery,
   buildRelations,
   isDefined,
@@ -713,7 +713,7 @@ class ProductVariantService extends TransactionBaseService {
       query.select = config.select
     }
 
-    const rels = buildObjectOptionBackToArray(query.relations)
+    const rels = buildLegacySelectOrRelationsFrom(query.relations)
     delete query.relations
 
     return {

@@ -15,7 +15,7 @@ import {
   TaxRate,
 } from "../models"
 import { TaxRateListByConfig } from "../types/tax-rate"
-import { buildObjectOptionBackToArray, isDefined } from "../utils"
+import { buildLegacySelectOrRelationsFrom, isDefined } from "../utils"
 import { dataSource } from "../loaders/database"
 
 const resolvableFields = [
@@ -32,7 +32,7 @@ export const TaxRateRepository = dataSource.getRepository(TaxRate).extend({
     const resolverFields: string[] = []
     if (isDefined(findOptions.select)) {
       const selectableCols: (keyof TaxRate)[] = []
-      const selectArray = buildObjectOptionBackToArray(
+      const selectArray = buildLegacySelectOrRelationsFrom(
         findOptions.select as FindOptionsSelect<TaxRate>
       )
       for (const k of selectArray) {
