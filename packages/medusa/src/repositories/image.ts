@@ -1,14 +1,31 @@
 import { Image } from "../models"
 import { dataSource } from "../loaders/database"
+import { In } from "typeorm"
 
 export const ImageRepository = dataSource.getRepository(Image).extend({
   async upsertImages(imageUrls: string[]) {
-    const imgToUpsert = imageUrls.map((imgUrl) => {
-      return { url: imgUrl }
+    const existingImages = await this.find({
+      where: {
+        url: In(imageUrls),
+      },
     })
-    return await this.upsert(imgToUpsert, {
-      conflictPaths: ["url"],
-      skipUpdateIfNoValuesChanged: true,
-    })
+    const existingImagesMap = new Map(
+      existingImages.map<[string, Image]>((img) => [img.url, img])
+    )
+
+    const upsertedImgs: Image[] = []
+
+    for (const url of imageUrls) {
+      const aImg = existingImagesMap.get(url)
+      if (aImg) {
+        upsertedImgs.push(aImg)
+      } else {
+        const newImg = this.create({ url })
+        const savedImg = await this.save(newImg)
+        upsertedImgs.push(savedImg)
+      }
+    }
+
+    return upsertedImgs
   },
 })

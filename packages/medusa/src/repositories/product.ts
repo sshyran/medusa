@@ -3,6 +3,7 @@ import { Brackets, FindOperator, FindOptionsSelect, In } from "typeorm"
 import { PriceList, Product, SalesChannel } from "../models"
 import { ExtendedFindConfig, WithRequiredProperty } from "../types/common"
 import { dataSource } from "../loaders/database"
+import { buildObjectOptionBackToArray } from "../utils"
 
 export type DefaultWithoutRelations = Omit<
   ExtendedFindConfig<Product>,
@@ -44,22 +45,7 @@ export const ProductRepository = dataSource.getRepository(Product).extend({
         let querybuilder = this.createQueryBuilder("products")
 
         if (Object.keys(select)?.length) {
-          // TODO: this is temporary to get the existing logic to work. Should be revisit with typeorm new api
-          const buildToSelect = (obj) => {
-            const output: string[] = []
-            Object.keys(obj).reduce((acc, key) => {
-              if (obj[key] != undefined && typeof obj[key] === "object") {
-                const deepOutput = buildToSelect(obj[key])
-                acc.push(`${key}.${deepOutput.join(".")}`)
-                return acc
-              }
-
-              acc.push(key)
-              return acc
-            }, output)
-            return output
-          }
-          querybuilder.select(buildToSelect(select))
+          querybuilder.select(buildObjectOptionBackToArray(select))
         }
 
         if (toplevel === "variants") {

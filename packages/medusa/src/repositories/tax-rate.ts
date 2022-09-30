@@ -46,11 +46,7 @@ export const TaxRateRepository = dataSource.getRepository(TaxRate).extend({
     }
 
     // TODO: waiting feedback on issue https://github.com/typeorm/typeorm/issues/9252
-    // TODO: otherwise rewrite it the new way
-    /*FindOptionsUtils.applyFindManyOptionsOrConditionsToQueryBuilder(
-      qb,
-      cleanOptions
-    )*/
+    qb.setFindOptions(cleanOptions || {})
 
     if (resolverFields.length > 0) {
       this.applyResolutionsToQueryBuilder(qb, resolverFields)

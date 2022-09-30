@@ -126,8 +126,12 @@ export function buildObjectOptionBackToArray<TEntity>(
   input:
     | FindOptionsWhere<TEntity>
     | FindOptionsSelect<TEntity>
-    | FindOptionsRelations<TEntity>
+    | FindOptionsRelations<TEntity> = {}
 ): (keyof TEntity)[] {
+  if (!Object.keys(input).length) {
+    return []
+  }
+
   const output: string[] = []
 
   for (const key of Object.keys(input)) {
@@ -149,13 +153,13 @@ export function buildObjectOptionBackToArray<TEntity>(
   return output as (keyof TEntity)[]
 }
 
-function buildSelects<TEntity>(
+export function buildSelects<TEntity>(
   selectCollection: string[]
 ): FindOptionsSelect<TEntity> {
   return buildRelationsOrSelect(selectCollection) as FindOptionsSelect<TEntity>
 }
 
-function buildRelations<TEntity>(
+export function buildRelations<TEntity>(
   relationCollection: string[]
 ): FindOptionsRelations<TEntity> {
   return buildRelationsOrSelect(
