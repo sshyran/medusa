@@ -106,6 +106,49 @@ function buildWhere<TWhereKeys, TEntity>(constraints: TWhereKeys): any {
   return where
 }
 
+/**
+ * Revert new object structure of find options to the legacy structure of previous version
+ * @example
+ * input: {
+ *   test: {
+ *     test1: true,
+ *     test2: true,
+ *     test3: {
+ *       test4: true
+ *     },
+ *   },
+ *   test2: true
+ * }
+ * output: [ [ 'test.test1', 'test.test2', 'test.test3.test4' ], 'test2' ]
+ * @param input
+ */
+export function buildObjectOptionBackToArray<TEntity>(
+  input:
+    | FindOptionsWhere<TEntity>
+    | FindOptionsSelect<TEntity>
+    | FindOptionsRelations<TEntity>
+): (keyof TEntity)[] {
+  const output: string[] = []
+
+  for (const key of Object.keys(input)) {
+    if (input[key] != undefined && typeof input[key] === "object") {
+      const deepRes = buildObjectOptionBackToArray(input[key])
+
+      const res = deepRes.reduce((acc, val) => {
+        acc.push(`${key}.${val}`)
+        return acc
+      }, [] as string[])
+
+      output.push(...res)
+      continue
+    }
+
+    output.push(key)
+  }
+
+  return output as (keyof TEntity)[]
+}
+
 function buildSelects<TEntity>(
   selectCollection: string[]
 ): FindOptionsSelect<TEntity> {

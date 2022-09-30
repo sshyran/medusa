@@ -1,9 +1,8 @@
 import { flatten, groupBy, map, merge } from "lodash"
-import { Brackets, FindOperator, In } from "typeorm"
+import { Brackets, FindOperator, FindOptionsSelect, In } from "typeorm"
 import { PriceList, Product, SalesChannel } from "../models"
 import { ExtendedFindConfig, WithRequiredProperty } from "../types/common"
 import { dataSource } from "../loaders/database"
-import { FindOptionsSelect } from "typeorm/find-options/FindOptionsSelect"
 
 export type DefaultWithoutRelations = Omit<
   ExtendedFindConfig<Product>,
@@ -35,50 +34,32 @@ export const ProductRepository = dataSource.getRepository(Product).extend({
   },
 
   async queryProductsWithIds(
-    query: ExtendedFindConfig<Product>,
     entityIds: string[],
     groupedRelations: { [toplevel: string]: string[] },
     withDeleted = false,
-    select: FindOptionsSelect<Product>
+    select: FindOptionsSelect<Product> = {}
   ): Promise<Product[]> {
-    if (query.relations?.) {
-
-    }
-
-    return await this.find({
-      select: {
-        ...query.select,
-        ...query.relations,
-      } as FindOptionsSelect<Product>,
-      relations: {
-
-      },
-      withDeleted: withDeleted,
-      relationLoadStrategy: "query",
-    })
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-    const entitiesIdsWithRelations = await Promise.all(
-      Object.entries(groupedRelations).map(async ([toplevel, rels]) => {
+    return await Promise.all(
+      Object.entries(groupedRelations).map(([toplevel, rels]) => {
         let querybuilder = this.createQueryBuilder("products")
 
-        if (select && select.length) {
-          querybuilder.select(select.map((f) => `products.${f}`))
+        if (Object.keys(select)?.length) {
+          // TODO: this is temporary to get the existing logic to work. Should be revisit with typeorm new api
+          const buildToSelect = (obj) => {
+            const output: string[] = []
+            Object.keys(obj).reduce((acc, key) => {
+              if (obj[key] != undefined && typeof obj[key] === "object") {
+                const deepOutput = buildToSelect(obj[key])
+                acc.push(`${key}.${deepOutput.join(".")}`)
+                return acc
+              }
+
+              acc.push(key)
+              return acc
+            }, output)
+            return output
+          }
+          querybuilder.select(buildToSelect(select))
         }
 
         if (toplevel === "variants") {
@@ -110,19 +91,24 @@ export const ProductRepository = dataSource.getRepository(Product).extend({
           )
         }
 
-        querybuilder = querybuilder.where("products.id IN (:...entitiesIds)", {
-          entitiesIds: entityIds,
-        })
-
         if (withDeleted) {
-          querybuilder = querybuilder.withDeleted()
+          querybuilder = querybuilder
+            .where("products.id IN (:...entitiesIds)", {
+              entitiesIds: entityIds,
+            })
+            .withDeleted()
+        } else {
+          querybuilder = querybuilder.where(
+            "products.deleted_at IS NULL AND products.id IN (:...entitiesIds)",
+            {
+              entitiesIds: entityIds,
+            }
+          )
         }
 
         return querybuilder.getMany()
       })
     ).then(flatten)
-
-    return entitiesIdsWithRelations
   },
 
   async findWithRelationsAndCount(
@@ -169,12 +155,12 @@ export const ProductRepository = dataSource.getRepository(Product).extend({
       entitiesIds,
       groupedRelations,
       idsOrOptionsWithoutRelations.withDeleted,
-      idsOrOptionsWithoutRelations.select
+      idsOrOptionsWithoutRelations.select as FindOptionsSelect<Product>
     )
 
     const entitiesAndRelations = entitiesIdsWithRelations.concat(entities)
     const entitiesToReturn =
-      this.mergeEntitiesWithRelations(entitiesAndRelations)
+      this.mergeEntitiesWithRelations_(entitiesAndRelations)
 
     return [entitiesToReturn, count]
   },
@@ -188,11 +174,12 @@ export const ProductRepository = dataSource.getRepository(Product).extend({
   ): Promise<Product[]> {
     let entities: Product[]
     if (Array.isArray(idsOrOptionsWithoutRelations)) {
-      entities = await this.findByIds(idsOrOptionsWithoutRelations, {
+      entities = await this.find({
+        where: { id: In(idsOrOptionsWithoutRelations) },
         withDeleted,
       })
     } else {
-      const result = await this.queryProducts(
+      const result = await this.queryProducts_(
         idsOrOptionsWithoutRelations,
         false
       )
@@ -209,7 +196,9 @@ export const ProductRepository = dataSource.getRepository(Product).extend({
       relations.length === 0 &&
       !Array.isArray(idsOrOptionsWithoutRelations)
     ) {
-      return await this.findByIds(entitiesIds, idsOrOptionsWithoutRelations)
+      return await this.find({
+        where: { id: In(entitiesIds), ...idsOrOptionsWithoutRelations },
+      })
     }
 
     const groupedRelations = this.getGroupedRelations(relations)
@@ -220,10 +209,7 @@ export const ProductRepository = dataSource.getRepository(Product).extend({
     )
 
     const entitiesAndRelations = entitiesIdsWithRelations.concat(entities)
-    const entitiesToReturn =
-      this.mergeEntitiesWithRelations(entitiesAndRelations)
-
-    return entitiesToReturn
+    return this.mergeEntitiesWithRelations_(entitiesAndRelations)
   },
 
   async findOneWithRelations(
@@ -271,7 +257,7 @@ export const ProductRepository = dataSource.getRepository(Product).extend({
     options: FindWithoutRelationsOptions = { where: {} },
     relations: string[] = []
   ): Promise<[Product[], number]> {
-    const cleanedOptions = this._cleanOptions(options)
+    const cleanedOptions = this.cleanOptions_(options)
 
     let qb = this.createQueryBuilder("product")
       .leftJoinAndSelect("product.variants", "variant")
@@ -339,7 +325,7 @@ export const ProductRepository = dataSource.getRepository(Product).extend({
     optionsWithoutRelations: FindWithoutRelationsOptions,
     shouldCount = false
   ): Promise<[Product[], number]> {
-    const tags = optionsWithoutRelations?.where?.tags
+    const tags = optionsWithoutRelations?.where?.tags as FindOperator<string>
     delete optionsWithoutRelations?.where?.tags
 
     const price_lists = optionsWithoutRelations?.where?.price_list_id
