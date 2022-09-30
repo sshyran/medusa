@@ -193,8 +193,8 @@ class InviteService extends TransactionBaseService {
     const { invite_id, user_email } = decoded
 
     return await this.atomicPhase_(async (m) => {
-      const userRepo = m.getCustomRepository(this.userRepo_)
-      const inviteRepo = m.getCustomRepository(this.inviteRepository_)
+      const userRepo = m.withRepository(this.userRepo_)
+      const inviteRepo = m.withRepository(this.inviteRepository_)
 
       const invite = await inviteRepo.findOne({ where: { id: invite_id } })
 
@@ -249,7 +249,7 @@ class InviteService extends TransactionBaseService {
   async resend(id): Promise<void> {
     const inviteRepo = this.manager_.withRepository(InviteRepository)
 
-    const invite = await inviteRepo.findOne({ id })
+    const invite = await inviteRepo.findOne({ where: { id } })
 
     if (!invite) {
       throw new MedusaError(

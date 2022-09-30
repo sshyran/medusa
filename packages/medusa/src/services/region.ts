@@ -288,7 +288,9 @@ class RegionService extends TransactionBaseService {
 
     if ((regionData as UpdateRegionInput).tax_provider_id) {
       const tp = await tpRepository.findOne({
-        where: { id: (regionData as UpdateRegionInput).tax_provider_id },
+        where: {
+          id: (regionData as UpdateRegionInput).tax_provider_id as string,
+        },
       })
       if (!tp) {
         throw new MedusaError(
